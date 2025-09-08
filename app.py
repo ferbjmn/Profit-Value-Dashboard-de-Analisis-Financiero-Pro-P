@@ -481,10 +481,10 @@ def main():
                                 x_pos = np.arange(len(años))
                                 width = 0.25
                                 
-                                # Colores modificados según solicitud
-                                ax.bar(x_pos - width, activos, width, label='Activos Totales', alpha=0.8, color='lightblue')
-                                ax.bar(x_pos, pasivos, width, label='Pasivos Totales', alpha=0.8, color='lightpink')
-                                ax.bar(x_pos + width, patrimonio, width, label='Patrimonio Neto', alpha=0.8, color='lightgreen')
+                                # Colores actualizados según la imagen de referencia
+                                ax.bar(x_pos - width, activos, width, label='Activos Totales', alpha=0.8, color='#87CEEB')  # Azul claro
+                                ax.bar(x_pos, pasivos, width, label='Pasivos Totales', alpha=0.8, color='#FFA07A')  # Naranja claro
+                                ax.bar(x_pos + width, patrimonio, width, label='Patrimonio Neto', alpha=0.8, color='#32CD32')  # Verde
                                 
                                 ax.set_ylabel('Millones USD')
                                 ax.set_title(f'{ticker}')
