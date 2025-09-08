@@ -174,14 +174,15 @@ def obtener_datos_financieros(tk, Tc_def):
         eps_growth = cagr4(fin, "Net Income")
         fcf_growth = cagr4(cf, "Free Cash Flow") or cagr4(cf, "Operating Cash Flow")
 
-        # Obtener datos históricos de balance sheet para los últimos 4 años
+        # Obtener datos históricos de balance sheet para los últimos 4 años - CORREGIDO
         bs_history = {}
         if bs is not None and not bs.empty:
             for year_col in bs.columns[:4]:  # Últimos 4 años
                 year_data = {}
-                year_data['Total Assets'] = bs[year_col].get('Total Assets', None)
-                year_data['Total Liabilities'] = bs[year_col].get('Total Liabilities', None)
-                year_data['Total Equity'] = bs[year_col].get('Total Stockholder Equity', None)
+                # Buscar los valores correctamente en el índice del DataFrame
+                year_data['Total Assets'] = bs.loc['Total Assets', year_col] if 'Total Assets' in bs.index else None
+                year_data['Total Liabilities'] = bs.loc['Total Liabilities', year_col] if 'Total Liabilities' in bs.index else None
+                year_data['Total Equity'] = bs.loc['Total Stockholder Equity', year_col] if 'Total Stockholder Equity' in bs.index else None
                 bs_history[year_col.year] = year_data
 
         return {
@@ -425,38 +426,42 @@ def main():
                             # Obtener datos históricos del balance sheet
                             bs_history = empresa.get('BalanceSheetHistory', {})
                             
-                            if bs_history:
+                            if bs_history and any(bs_history.values()):
                                 # Preparar datos para el gráfico
                                 years = sorted(bs_history.keys())
                                 assets = [bs_history[year].get('Total Assets', 0) for year in years]
                                 liabilities = [bs_history[year].get('Total Liabilities', 0) for year in years]
                                 equity = [bs_history[year].get('Total Equity', 0) for year in years]
                                 
-                                # Crear gráfico de barras agrupadas
-                                fig, ax = plt.subplots(figsize=(10, 5))
-                                
-                                x_pos = np.arange(len(years))
-                                width = 0.25
-                                
-                                # Convertir a millones para mejor visualización
-                                assets_m = [a/1e6 if a else 0 for a in assets]
-                                liabilities_m = [l/1e6 if l else 0 for l in liabilities]
-                                equity_m = [e/1e6 if e else 0 for e in equity]
-                                
-                                # Crear barras para cada categoría
-                                ax.bar(x_pos - width, assets_m, width, label='Activos', color='#45B7D1')
-                                ax.bar(x_pos, liabilities_m, width, label='Pasivos', color='#FF6B6B')
-                                ax.bar(x_pos + width, equity_m, width, label='Patrimonio', color='#4ECDC4')
-                                
-                                ax.set_xlabel('Año')
-                                ax.set_ylabel('Millones USD')
-                                ax.set_title(f"{empresa['Ticker']} - Estructura Financiera")
-                                ax.set_xticks(x_pos)
-                                ax.set_xticklabels(years)
-                                ax.legend()
-                                
-                                st.pyplot(fig)
-                                plt.close()
+                                # Verificar que tenemos datos válidos
+                                if any(x is not None and x > 0 for x in assets + liabilities + equity):
+                                    # Crear gráfico de barras agrupadas
+                                    fig, ax = plt.subplots(figsize=(10, 5))
+                                    
+                                    x_pos = np.arange(len(years))
+                                    width = 0.25
+                                    
+                                    # Convertir a millones para mejor visualización
+                                    assets_m = [a/1e6 if a and a > 0 else 0 for a in assets]
+                                    liabilities_m = [l/1e6 if l and l > 0 else 0 for l in liabilities]
+                                    equity_m = [e/1e6 if e and e > 0 else 0 for e in equity]
+                                    
+                                    # Crear barras para cada categoría
+                                    ax.bar(x_pos - width, assets_m, width, label='Activos', color='#45B7D1')
+                                    ax.bar(x_pos, liabilities_m, width, label='Pasivos', color='#FF6B6B')
+                                    ax.bar(x_pos + width, equity_m, width, label='Patrimonio', color='#4ECDC4')
+                                    
+                                    ax.set_xlabel('Año')
+                                    ax.set_ylabel('Millones USD')
+                                    ax.set_title(f"{empresa['Ticker']} - Estructura Financiera")
+                                    ax.set_xticks(x_pos)
+                                    ax.set_xticklabels(years)
+                                    ax.legend()
+                                    
+                                    st.pyplot(fig)
+                                    plt.close()
+                                else:
+                                    st.warning("Datos financieros históricos no disponibles")
                             else:
                                 st.warning("No hay datos históricos disponibles")
                         
