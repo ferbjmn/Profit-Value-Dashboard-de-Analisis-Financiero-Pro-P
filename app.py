@@ -400,11 +400,11 @@ def main():
             st.pyplot(fig)
             plt.close()
 
-        # =============================================================
+        # =====================================================
         # SECCIÓN 4: ESTRUCTURA DE CAPITAL Y LIQUIDEZ
-        # =============================================================
+        # =====================================================
         st.header("🏦 Estructura de Capital y Liquidez (por sector)")
-
+        
         for sec in sectors_ordered:
             sec_df = df[df["Sector"] == sec]
             if sec_df.empty:
@@ -416,45 +416,49 @@ def main():
                     c1, c2 = st.columns(2)
                     
                     with c1:
-                        st.caption("Estructura Patrimonial (Último año disponible)")
+                        st.caption("Activos, Pasivos y Patrimonio (Últimos 4 años)")
                         
-                        # Crear gráfico de barras para cada empresa en el chunk
-                        fig, ax = plt.subplots(figsize=(12, 6))
-                        
-                        # Preparar datos para el gráfico de barras
-                        tickers = []
-                        assets_data = []
-                        liabilities_data = []
-                        equity_data = []
-                        
+                        # Crear gráfico para cada empresa en el chunk
                         for _, empresa in chunk.iterrows():
-                            tickers.append(empresa['Ticker'])
-                            assets_data.append((empresa.get('TotalAssets') or 0) / 1e6)  # Convertir a millones
-                            liabilities_data.append((empresa.get('TotalLiabilities') or 0) / 1e6)
-                            equity_data.append((empresa.get('TotalEquity') or 0) / 1e6)
-                        
-                        # Posiciones de las barras
-                        x_pos = np.arange(len(tickers))
-                        width = 0.25
-                        
-                        # Crear barras para cada componente
-                        ax.bar(x_pos - width, assets_data, width, label='Activos Totales', color='#45B7D1', alpha=0.8)
-                        ax.bar(x_pos, liabilities_data, width, label='Pasivos Totales', color='#FF6B6B', alpha=0.8)
-                        ax.bar(x_pos + width, equity_data, width, label='Patrimonio Neto', color='#4ECDC4', alpha=0.8)
-                        
-                        # Configurar el gráfico
-                        ax.set_xlabel('Empresas')
-                        ax.set_ylabel('Millones USD')
-                        ax.set_title('Estructura Patrimonial - Comparativa entre Empresas')
-                        ax.set_xticks(x_pos)
-                        ax.set_xticklabels(tickers, rotation=45, ha='right')
-                        ax.legend()
-                        
-                        # Añadir grid para mejor lectura
-                        ax.grid(True, alpha=0.3, axis='y')
-                        
-                        st.pyplot(fig)
-                        plt.close()
+                            st.markdown(f"**{empresa['Ticker']}**")
+                            
+                            # Obtener datos históricos del balance sheet
+                            bs_history = empresa.get('BalanceSheetHistory', {})
+                            
+                            if bs_history:
+                                # Preparar datos para el gráfico
+                                years = sorted(bs_history.keys())
+                                assets = [bs_history[year].get('Total Assets', 0) for year in years]
+                                liabilities = [bs_history[year].get('Total Liabilities', 0) for year in years]
+                                equity = [bs_history[year].get('Total Equity', 0) for year in years]
+                                
+                                # Crear gráfico de barras agrupadas
+                                fig, ax = plt.subplots(figsize=(10, 5))
+                                
+                                x_pos = np.arange(len(years))
+                                width = 0.25
+                                
+                                # Convertir a millones para mejor visualización
+                                assets_m = [a/1e6 if a else 0 for a in assets]
+                                liabilities_m = [l/1e6 if l else 0 for l in liabilities]
+                                equity_m = [e/1e6 if e else 0 for e in equity]
+                                
+                                # Crear barras para cada categoría
+                                ax.bar(x_pos - width, assets_m, width, label='Activos', color='#45B7D1')
+                                ax.bar(x_pos, liabilities_m, width, label='Pasivos', color='#FF6B6B')
+                                ax.bar(x_pos + width, equity_m, width, label='Patrimonio', color='#4ECDC4')
+                                
+                                ax.set_xlabel('Año')
+                                ax.set_ylabel('Millones USD')
+                                ax.set_title(f"{empresa['Ticker']} - Estructura Financiera")
+                                ax.set_xticks(x_pos)
+                                ax.set_xticklabels(years)
+                                ax.legend()
+                                
+                                st.pyplot(fig)
+                                plt.close()
+                            else:
+                                st.warning("No hay datos históricos disponibles")
                         
                     with c2:
                         st.caption("Liquidez")
