@@ -114,29 +114,22 @@ def obtener_balance_historico(ticker, años=4):
     """Obtener datos históricos de balance para los últimos años"""
     try:
         tkr = yf.Ticker(ticker)
-        # Obtener balance sheets anuales
         balance_sheets = tkr.balance_sheet
         if balance_sheets is None or balance_sheets.empty:
             return None
             
-        # Filtrar los últimos 'años' años
         fechas_disponibles = balance_sheets.columns[:min(años, len(balance_sheets.columns))]
         
         datos = {}
         for fecha in fechas_disponibles:
             año = fecha.year
-            # Buscar activos totales
             activos = safe_first(seek_row(balance_sheets[fecha], [
                 "Total Assets", "TotalAssets", "Total Current Assets"
             ])) or 0
-            
-            # Buscar pasivos totales
             pasivos = safe_first(seek_row(balance_sheets[fecha], [
                 "Total Liabilities", "Total Liabilities Net Minority Interest",
                 "Total Current Liabilities"
             ])) or 0
-            
-            # Buscar patrimonio neto
             patrimonio = safe_first(seek_row(balance_sheets[fecha], [
                 "Total Stockholder Equity", "Stockholders Equity",
                 "Common Stock Equity"
@@ -161,7 +154,6 @@ def obtener_datos_financieros(tk, Tc_def):
         fin = tkr.financials
         cf = tkr.cashflow
         
-        # Datos básicos
         beta = info.get("beta", 1)
         ke = calc_ke(beta)
         
@@ -172,31 +164,26 @@ def obtener_datos_financieros(tk, Tc_def):
             "Cash Cash Equivalents And Short Term Investments",
         ]))
         equity = safe_first(seek_row(bs, ["Common Stock Equity", "Total Stockholder Equity"]))
-
         interest = safe_first(seek_row(fin, ["Interest Expense"]))
         ebt = safe_first(seek_row(fin, ["Ebt", "EBT"]))
         tax_exp = safe_first(seek_row(fin, ["Income Tax Expense"]))
-        ebit = safe_first(seek_row(fin, ["EBIT", "Operating Income",
-                                       "Earnings Before Interest and Taxes"]))
-
+        ebit = safe_first(seek_row(fin, ["EBIT", "Operating Income", "Earnings Before Interest and Taxes"]))
+        
         kd = calc_kd(interest, debt)
         tax = tax_exp / ebt if ebt else Tc_def
         mcap = info.get("marketCap", 0)
         wacc = calc_wacc(mcap, debt, ke, kd, tax)
-
+        
         nopat = ebit * (1 - tax) if ebit is not None else None
         invested = (equity or 0) + ((debt or 0) - (cash or 0))
         roic = nopat / invested if (nopat is not None and invested) else None
-        
-        # CALCULAR CREACIÓN DE VALOR (WACC vs ROIC) en lugar de EVA
         creacion_valor = (roic - wacc) * 100 if all(v is not None for v in (roic, wacc)) else None
-
+        
         price = info.get("currentPrice")
         fcf = safe_first(seek_row(cf, ["Free Cash Flow"]))
         shares = info.get("sharesOutstanding")
         pfcf = price / (fcf/shares) if (fcf and shares) else None
-
-        # Cálculo de ratios
+        
         current_ratio = info.get("currentRatio")
         quick_ratio = info.get("quickRatio")
         debt_eq = info.get("debtToEquity")
@@ -206,11 +193,9 @@ def obtener_datos_financieros(tk, Tc_def):
         roa = info.get("returnOnAssets")
         roe = info.get("returnOnEquity")
         
-        # Dividendos
         div_yield = info.get("dividendYield")
         payout = info.get("payoutRatio")
         
-        # Crecimiento
         revenue_growth = cagr4(fin, "Total Revenue")
         eps_growth = cagr4(fin, "Net Income")
         fcf_growth = cagr4(cf, "Free Cash Flow") or cagr4(cf, "Operating Cash Flow")
@@ -237,7 +222,7 @@ def obtener_datos_financieros(tk, Tc_def):
             "Profit Margin": profit_margin,
             "WACC": wacc,
             "ROIC": roic,
-            "Creacion Valor (Wacc vs Roic)": creacion_valor,  # Cambiado de EVA
+            "Creacion Valor (Wacc vs Roic)": creacion_valor,
             "Revenue Growth": revenue_growth,
             "EPS Growth": eps_growth,
             "FCF Growth": fcf_growth,
@@ -286,7 +271,7 @@ def main():
                 except Exception as e:
                     errs.append({"Ticker": tk, "Error": str(e)})
                 progress_bar.progress((i + 1) / len(tickers))
-                time.sleep(1)  # Evitar rate limiting
+                time.sleep(1)
 
         status_text.text("✅ Análisis completado!")
         time.sleep(0.5)
@@ -303,28 +288,18 @@ def main():
         df["SectorRank"] = df["Sector"].map(SECTOR_RANK).fillna(99).astype(int)
         df = df.sort_values(["SectorRank", "Sector", "Ticker"])
         
-        # Formatear valores para visualización
+        # Formato visual
         df_disp = df.copy()
-        
-        # Columnas con 2 decimales
         for col in ["P/E", "P/B", "P/FCF", "Current Ratio", "Quick Ratio", "Debt/Eq", "LtDebt/Eq"]:
             df_disp[col] = df_disp[col].apply(lambda x: format_number(x, 2))
-            
-        # Porcentajes con 2 decimales
         for col in ["Dividend Yield %", "Payout Ratio", "ROA", "ROE", "Oper Margin", 
                    "Profit Margin", "WACC", "ROIC", "Revenue Growth", "EPS Growth", "FCF Growth"]:
             df_disp[col] = df_disp[col].apply(lambda x: format_number(x, 2, is_percent=True))
-            
-        # Creación de Valor con 2 decimales y porcentaje
         df_disp["Creacion Valor (Wacc vs Roic)"] = df_disp["Creacion Valor (Wacc vs Roic)"].apply(
             lambda x: format_number(x/100, 2, is_percent=True) if pd.notnull(x) else "N/D"
         )
-            
-        # Precio y MarketCap con 2 decimales
         df_disp["Precio"] = df_disp["Precio"].apply(lambda x: f"${float(x):,.2f}" if pd.notnull(x) else "N/D")
         df_disp["MarketCap"] = df_disp["MarketCap"].apply(lambda x: f"${float(x)/1e9:,.2f}B" if pd.notnull(x) else "N/D")
-        
-        # Asegurar que las columnas de texto no sean None
         for c in ["Nombre", "País", "Industria"]:
             df_disp[c] = df_disp[c].fillna("N/D").replace({None: "N/D", "": "N/D"})
 
@@ -332,8 +307,6 @@ def main():
         # SECCIÓN 1: RESUMEN GENERAL
         # =====================================================
         st.header("📋 Resumen General (agrupado por Sector)")
-        
-        # Mostrar tabla
         st.dataframe(
             df_disp[[
                 "Ticker", "Nombre", "País", "Industria", "Sector",
@@ -345,7 +318,6 @@ def main():
             use_container_width=True,
             height=500
         )
-
         if errs:
             st.subheader("🚫 Tickers con error")
             st.table(pd.DataFrame(errs))
@@ -356,12 +328,10 @@ def main():
         # SECCIÓN 2: ANÁLISIS DE VALORACIÓN
         # =====================================================
         st.header("💰 Análisis de Valoración (por Sector)")
-        
         for sec in sectors_ordered:
             sec_df = df[df["Sector"] == sec]
             if sec_df.empty:
                 continue
-                
             with st.expander(f"Sector: {sec} ({len(sec_df)} empresas)", expanded=False):
                 fig, ax = plt.subplots(figsize=(10, 4))
                 val = sec_df[["Ticker", "P/E", "P/B", "P/FCF"]].set_index("Ticker").apply(pd.to_numeric, errors="coerce")
@@ -375,7 +345,6 @@ def main():
         # SECCIÓN 3: RENTABILIDAD Y EFICIENCIA
         # =====================================================
         st.header("📈 Rentabilidad y Eficiencia")
-        
         tabs = st.tabs(["ROE vs ROA", "Márgenes", "WACC vs ROIC"])
 
         with tabs[0]:
@@ -383,7 +352,6 @@ def main():
                 sec_df = df[df["Sector"] == sec]
                 if sec_df.empty:
                     continue
-                    
                 with st.expander(f"Sector: {sec}", expanded=False):
                     fig, ax = plt.subplots(figsize=(10, 5))
                     rr = pd.DataFrame({
@@ -401,7 +369,6 @@ def main():
                 sec_df = df[df["Sector"] == sec]
                 if sec_df.empty:
                     continue
-                    
                 with st.expander(f"Sector: {sec}", expanded=False):
                     fig, ax = plt.subplots(figsize=(10, 5))
                     mm = pd.DataFrame({
@@ -427,169 +394,84 @@ def main():
             st.pyplot(fig)
             plt.close()
 
-# =============================================================
-# SECCIÓN 4: ESTRUCTURA DE CAPITAL Y LIQUIDEZ
-# =============================================================
-st.header("🏦 Estructura de Capital y Liquidez (por sector)")
-
-for sec in sectors_ordered:
-    sec_df = df[df["Sector"] == sec]
-    if sec_df.empty:
-        continue
-        
-    with st.expander(f"Sector: {sec}", expanded=False):
-        for i, chunk in enumerate(chunk_df(sec_df), 1):
-            st.caption(f"Bloque {i}")
-            c1, c2 = st.columns(2)
-            
-            with c1:
-                st.caption("Patrimonio Deuda Activos (Últimos 4 años)")
-                
-                # Obtener datos históricos para cada ticker en el chunk
-                datos_historicos = {}
-                for _, empresa in chunk.iterrows():
-                    ticker = empresa["Ticker"]
-                    balance_data = obtener_balance_historico(ticker)
-                    if balance_data:
-                        datos_historicos[ticker] = balance_data
-                
-                if datos_historicos:
-                    # Crear gráfico para cada empresa (tamaño fijo)
-                    fig, axes = plt.subplots(len(datos_historicos), 1, 
-                                            figsize=(10, 5), 
-                                            sharex=True, sharey=True)
-                    fig.suptitle(f"Estructura Patrimonial - Sector {sec}", fontsize=16)
-                    
-                    if len(datos_historicos) == 1:
-                        axes = [axes]
-                    
-                    for idx, (ticker, datos) in enumerate(datos_historicos.items()):
-                        ax = axes[idx]
-                        años = sorted(datos.keys())
-                        
-                        # Preparar datos para el gráfico
-                        activos = [datos[año]["Activos Totales"] for año in años]
-                        pasivos = [datos[año]["Pasivos Totales"] for año in años]
-                        patrimonio = [datos[año]["Patrimonio Neto"] for año in años]
-                        
-                        # Convertir a millones
-                        divisor = 1e6
-                        activos = [a/divisor for a in activos]
-                        pasivos = [p/divisor for p in pasivos]
-                        patrimonio = [pn/divisor for pn in patrimonio]
-                        
-                        # Crear gráfico de barras
-                        x_pos = np.arange(len(años))
-                        width = 0.25
-                        
-                        ax.bar(x_pos - width, activos, width, label='Activos Totales', alpha=0.8, color='#87CEEB')
-                        ax.bar(x_pos, pasivos, width, label='Pasivos Totales', alpha=0.8, color='#FFA07A')
-                        ax.bar(x_pos + width, patrimonio, width, label='Patrimonio Neto', alpha=0.8, color='#32CD32')
-                        
-                        ax.set_ylabel('Millones USD')
-                        ax.set_title(f'{ticker}')
-                        ax.set_xticks(x_pos)
-                        ax.set_xticklabels(años)
-                        ax.legend()
-                        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
-                    
-                    plt.tight_layout(rect=[0, 0, 1, 0.95])
-                    st.pyplot(fig)
-                    plt.close()
-                else:
-                    st.info(f"No se pudieron obtener datos históricos para las empresas del sector {sec}")
-                    
-            with c2:
-                st.caption("Liquidez")
-                fig, ax = plt.subplots(figsize=(10, 5))
-                liq = chunk[["Ticker", "Current Ratio", "Quick Ratio"]].set_index("Ticker").apply(pd.to_numeric, errors="coerce")
-                liq.plot(kind="bar", ax=ax, rot=45)
-                ax.axhline(1, color="green", linestyle="--")
-                ax.set_ylabel("Ratio")
-                auto_ylim(ax, liq)
-                st.pyplot(fig)
-                plt.close()
-                
         # =====================================================
-        # SECCIÓN 5: CRECIMIENTO
+        # SECCIÓN 4: ESTRUCTURA DE CAPITAL Y LIQUIDEZ
         # =====================================================
-        st.header("🚀 Crecimiento (CAGR 3-4 años, por sector)")
-        
+        st.header("🏦 Estructura de Capital y Liquidez (por sector)")
         for sec in sectors_ordered:
             sec_df = df[df["Sector"] == sec]
             if sec_df.empty:
                 continue
-                
             with st.expander(f"Sector: {sec}", expanded=False):
                 for i, chunk in enumerate(chunk_df(sec_df), 1):
                     st.caption(f"Bloque {i}")
-                    fig, ax = plt.subplots(figsize=(12, 6))
-                    gdf = pd.DataFrame({
-                        "Revenue Growth": (chunk["Revenue Growth"]*100).values,
-                        "EPS Growth": (chunk["EPS Growth"]*100).values,
-                        "FCF Growth": (chunk["FCF Growth"]*100).values
-                    }, index=chunk["Ticker"])
-                    gdf.plot(kind="bar", ax=ax, rot=45)
-                    ax.axhline(0, color="black", linewidth=0.8)
-                    ax.set_ylabel("%")
-                    auto_ylim(ax, gdf)
-                    st.pyplot(fig)
-                    plt.close()
+                    c1, c2 = st.columns(2)
+                    
+                    with c1:
+                        st.caption("Patrimonio Deuda Activos (Últimos 4 años)")
+                        datos_historicos = {}
+                        for _, empresa in chunk.iterrows():
+                            ticker = empresa["Ticker"]
+                            balance_data = obtener_balance_historico(ticker)
+                            if balance_data:
+                                datos_historicos[ticker] = balance_data
+                        if datos_historicos:
+                            fig, axes = plt.subplots(len(datos_historicos), 1, 
+                                                    figsize=(10, 5),
+                                                    sharex=True, sharey=True)
+                            fig.suptitle(f"Estructura Patrimonial - Sector {sec}", fontsize=16)
+                            if len(datos_historicos) == 1:
+                                axes = [axes]
+                            for idx, (ticker, datos) in enumerate(datos_historicos.items()):
+                                ax = axes[idx]
+                                años = sorted(datos.keys())
+                                activos = [datos[a]["Activos Totales"]/1e6 for a in años]
+                                pasivos = [datos[a]["Pasivos Totales"]/1e6 for a in años]
+                                patrimonio = [datos[a]["Patrimonio Neto"]/1e6 for a in años]
+                                x_pos = np.arange(len(años))
+                                width = 0.25
+                                ax.bar(x_pos - width, activos, width, label='Activos Totales', alpha=0.8, color='#87CEEB')
+                                ax.bar(x_pos, pasivos, width, label='Pasivos Totales', alpha=0.8, color='#FFA07A')
+                                ax.bar(x_pos + width, patrimonio, width, label='Patrimonio Neto', alpha=0.8, color='#32CD32')
+                                ax.set_ylabel('Millones USD')
+                                ax.set_title(f'{ticker}')
+                                ax.set_xticks(x_pos)
+                                ax.set_xticklabels(años)
+                                ax.legend()
+                                plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+                            plt.tight_layout(rect=[0, 0, 1, 0.95])
+                            st.pyplot(fig)
+                            plt.close()
+                        else:
+                            st.info(f"No se pudieron obtener datos históricos para las empresas del sector {sec}")
+                    
+                    with c2:
+                        st.caption("Liquidez")
+                        fig, ax = plt.subplots(figsize=(10, 5))
+                        liq = chunk[["Ticker", "Current Ratio", "Quick Ratio"]].set_index("Ticker").apply(pd.to_numeric, errors="coerce")
+                        liq.plot(kind="bar", ax=ax, rot=45)
+                        ax.axhline(1, color="green", linestyle="--")
+                        ax.set_ylabel("Ratio")
+                        auto_ylim(ax, liq)
+                        st.pyplot(fig)
+                        plt.close()
 
         # =====================================================
-        # SECCIÓN 6: ANÁLISIS INDIVIDUAL
+        # SECCIÓN 5: CRECIMIENTO
         # =====================================================
-        st.header("🔍 Análisis por Empresa")
-        pick = st.selectbox("Selecciona empresa", df_disp["Ticker"].unique())
-        det_disp = df_disp[df_disp["Ticker"] == pick].iloc[0]
-        det_raw = df[df["Ticker"] == pick].iloc[0]
-
-        st.markdown(f"""
-        **{det_raw['Nombre']}**  
-        **Sector:** {det_raw['Sector']}  
-        **País:** {det_raw['País']}  
-        **Industria:** {det_raw['Industria']}
-        """)
-
-        cA, cB, cC = st.columns(3)
-        with cA:
-            st.metric("Precio", det_disp["Precio"])
-            st.metric("P/E", det_disp["P/E"])
-            st.metric("P/B", det_disp["P/B"])
-            st.metric("P/FCF", det_disp["P/FCF"])
-            
-        with cB:
-            st.metric("Market Cap", det_disp["MarketCap"])
-            st.metric("ROIC", det_disp["ROIC"])
-            st.metric("WACC", det_disp["WACC"])
-            st.metric("Creación Valor", det_disp["Creacion Valor (Wacc vs Roic)"])
-            
-        with cC:
-            st.metric("ROE", det_disp["ROE"])
-            st.metric("Dividend Yield", det_disp["Dividend Yield %"])
-            st.metric("Current Ratio", det_disp["Current Ratio"])
-            st.metric("Debt/Eq", det_disp["Debt/Eq"])
-
-        st.subheader("ROIC vs WACC")
-        if pd.notnull(det_raw["ROIC"]) and pd.notnull(det_raw["WACC"]):
-            fig, ax = plt.subplots(figsize=(5, 4))
-            comp = pd.DataFrame({
-                "ROIC": [det_raw["ROIC"]*100],
-                "WACC": [det_raw["WACC"]*100]
-            }, index=[pick])
-            comp.plot(kind="bar", ax=ax, rot=0, legend=False, 
-                     color=["green" if det_raw["ROIC"] > det_raw["WACC"] else "red", "gray"])
-            ax.set_ylabel("%")
-            auto_ylim(ax, comp)
-            st.pyplot(fig)
-            plt.close()
-            
-            if det_raw["ROIC"] > det_raw["WACC"]:
-                st.success("✅ Crea valor (ROIC > WACC)")
-            else:
-                st.error("❌ Destruye valor (ROIC < WACC)")
-        else:
-            st.warning("Datos insuficientes para comparar ROIC/WACC")
+        st.header("📊 Crecimiento (últimos 4 años)")
+        for sec in sectors_ordered:
+            sec_df = df[df["Sector"] == sec]
+            if sec_df.empty:
+                continue
+            with st.expander(f"Sector: {sec}", expanded=False):
+                fig, ax = plt.subplots(figsize=(12, 5))
+                growth = sec_df[["Ticker", "Revenue Growth", "EPS Growth", "FCF Growth"]].set_index("Ticker")*100
+                growth.plot(kind="bar", ax=ax, rot=45)
+                ax.set_ylabel("% CAGR")
+                auto_ylim(ax, growth)
+                st.pyplot(fig)
+                plt.close()
 
 if __name__ == "__main__":
     main()
