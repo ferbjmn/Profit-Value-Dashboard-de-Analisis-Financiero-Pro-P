@@ -427,91 +427,89 @@ def main():
             st.pyplot(fig)
             plt.close()
 
-        # =============================================================
-        # SECCIÓN 4: ESTRUCTURA DE CAPITAL Y LIQUIDEZ
-        # =============================================================
-        st.header("🏦 Estructura de Capital y Liquidez (por sector)")
+# =============================================================
+# SECCIÓN 4: ESTRUCTURA DE CAPITAL Y LIQUIDEZ
+# =============================================================
+st.header("🏦 Estructura de Capital y Liquidez (por sector)")
 
-        for sec in sectors_ordered:
-            sec_df = df[df["Sector"] == sec]
-            if sec_df.empty:
-                continue
+for sec in sectors_ordered:
+    sec_df = df[df["Sector"] == sec]
+    if sec_df.empty:
+        continue
+        
+    with st.expander(f"Sector: {sec}", expanded=False):
+        for i, chunk in enumerate(chunk_df(sec_df), 1):
+            st.caption(f"Bloque {i}")
+            c1, c2 = st.columns(2)
+            
+            with c1:
+                st.caption("Patrimonio Deuda Activos (Últimos 4 años)")
                 
-            with st.expander(f"Sector: {sec}", expanded=False):
-                for i, chunk in enumerate(chunk_df(sec_df), 1):
-                    st.caption(f"Bloque {i}")
-                    c1, c2 = st.columns(2)
+                # Obtener datos históricos para cada ticker en el chunk
+                datos_historicos = {}
+                for _, empresa in chunk.iterrows():
+                    ticker = empresa["Ticker"]
+                    balance_data = obtener_balance_historico(ticker)
+                    if balance_data:
+                        datos_historicos[ticker] = balance_data
+                
+                if datos_historicos:
+                    # Crear gráfico para cada empresa (tamaño fijo)
+                    fig, axes = plt.subplots(len(datos_historicos), 1, 
+                                            figsize=(10, 5), 
+                                            sharex=True, sharey=True)
+                    fig.suptitle(f"Estructura Patrimonial - Sector {sec}", fontsize=16)
                     
-                    with c1:
-                        st.caption("Patrimonio Deuda Activos (Últimos 4 años)")
+                    if len(datos_historicos) == 1:
+                        axes = [axes]
+                    
+                    for idx, (ticker, datos) in enumerate(datos_historicos.items()):
+                        ax = axes[idx]
+                        años = sorted(datos.keys())
                         
-                        # Obtener datos históricos para cada ticker en el chunk
-                        datos_historicos = {}
-                        for _, empresa in chunk.iterrows():
-                            ticker = empresa["Ticker"]
-                            balance_data = obtener_balance_historico(ticker)
-                            if balance_data:
-                                datos_historicos[ticker] = balance_data
+                        # Preparar datos para el gráfico
+                        activos = [datos[año]["Activos Totales"] for año in años]
+                        pasivos = [datos[año]["Pasivos Totales"] for año in años]
+                        patrimonio = [datos[año]["Patrimonio Neto"] for año in años]
                         
-                        if datos_historicos:
-                            # Crear gráfico para cada empresa
-                            fig, axes = plt.subplots(len(datos_historicos), 1, 
-                                                   figsize=(12, 4 * len(datos_historicos)))
-                            fig.suptitle(f"Estructura Patrimonial - Sector {sec}", fontsize=16)
-                            
-                            if len(datos_historicos) == 1:
-                                axes = [axes]
-                            
-                            for idx, (ticker, datos) in enumerate(datos_historicos.items()):
-                                ax = axes[idx]
-                                años = sorted(datos.keys())
-                                
-                                # Preparar datos para el gráfico
-                                activos = [datos[año]["Activos Totales"] for año in años]
-                                pasivos = [datos[año]["Pasivos Totales"] for año in años]
-                                patrimonio = [datos[año]["Patrimonio Neto"] for año in años]
-                                
-                                # Convertir a millones para mejor visualización
-                                divisor = 1e6
-                                activos = [a/divisor for a in activos]
-                                pasivos = [p/divisor for p in pasivos]
-                                patrimonio = [pn/divisor for pn in patrimonio]
-                                
-                                # Crear gráfico de barras
-                                x_pos = np.arange(len(años))
-                                width = 0.25
-                                
-                                # Colores actualizados según la imagen de referencia
-                                ax.bar(x_pos - width, activos, width, label='Activos Totales', alpha=0.8, color='#87CEEB')  # Azul claro
-                                ax.bar(x_pos, pasivos, width, label='Pasivos Totales', alpha=0.8, color='#FFA07A')  # Naranja claro
-                                ax.bar(x_pos + width, patrimonio, width, label='Patrimonio Neto', alpha=0.8, color='#32CD32')  # Verde
-                                
-                                ax.set_ylabel('Millones USD')
-                                ax.set_title(f'{ticker}')
-                                ax.set_xticks(x_pos)
-                                ax.set_xticklabels(años)
-                                ax.legend()
-                                
-                                # Rotar etiquetas si hay muchos años
-                                plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
-                            
-                            plt.tight_layout()
-                            st.pyplot(fig)
-                            plt.close()
-                        else:
-                            st.info(f"No se pudieron obtener datos históricos para las empresas del sector {sec}")
-                            
-                    with c2:
-                        st.caption("Liquidez")
-                        fig, ax = plt.subplots(figsize=(10, 5))
-                        liq = chunk[["Ticker", "Current Ratio", "Quick Ratio"]].set_index("Ticker").apply(pd.to_numeric, errors="coerce")
-                        liq.plot(kind="bar", ax=ax, rot=45)
-                        ax.axhline(1, color="green", linestyle="--")
-                        ax.set_ylabel("Ratio")
-                        auto_ylim(ax, liq)
-                        st.pyplot(fig)
-                        plt.close()
-
+                        # Convertir a millones
+                        divisor = 1e6
+                        activos = [a/divisor for a in activos]
+                        pasivos = [p/divisor for p in pasivos]
+                        patrimonio = [pn/divisor for pn in patrimonio]
+                        
+                        # Crear gráfico de barras
+                        x_pos = np.arange(len(años))
+                        width = 0.25
+                        
+                        ax.bar(x_pos - width, activos, width, label='Activos Totales', alpha=0.8, color='#87CEEB')
+                        ax.bar(x_pos, pasivos, width, label='Pasivos Totales', alpha=0.8, color='#FFA07A')
+                        ax.bar(x_pos + width, patrimonio, width, label='Patrimonio Neto', alpha=0.8, color='#32CD32')
+                        
+                        ax.set_ylabel('Millones USD')
+                        ax.set_title(f'{ticker}')
+                        ax.set_xticks(x_pos)
+                        ax.set_xticklabels(años)
+                        ax.legend()
+                        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+                    
+                    plt.tight_layout(rect=[0, 0, 1, 0.95])
+                    st.pyplot(fig)
+                    plt.close()
+                else:
+                    st.info(f"No se pudieron obtener datos históricos para las empresas del sector {sec}")
+                    
+            with c2:
+                st.caption("Liquidez")
+                fig, ax = plt.subplots(figsize=(10, 5))
+                liq = chunk[["Ticker", "Current Ratio", "Quick Ratio"]].set_index("Ticker").apply(pd.to_numeric, errors="coerce")
+                liq.plot(kind="bar", ax=ax, rot=45)
+                ax.axhline(1, color="green", linestyle="--")
+                ax.set_ylabel("Ratio")
+                auto_ylim(ax, liq)
+                st.pyplot(fig)
+                plt.close()
+                
         # =====================================================
         # SECCIÓN 5: CRECIMIENTO
         # =====================================================
