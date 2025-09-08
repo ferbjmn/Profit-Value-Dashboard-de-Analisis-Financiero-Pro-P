@@ -444,9 +444,9 @@ def main():
                                 equity_m = [e/1e6 if e else 0 for e in equity]
                                 
                                 # Crear barras para cada categoría
-                                ax.bar(x_pos - width, assets_m, width, label='Activos', color='#45B7D1')
-                                ax.bar(x_pos, liabilities_m, width, label='Pasivos', color='#FF6B6B')
-                                ax.bar(x_pos + width, equity_m, width, label='Patrimonio', color='#4ECDC4')
+                                ax.bar(x_pos - width, assets_m, width, label='Activos', color='blue')
+                                ax.bar(x_pos, liabilities_m, width, label='Pasivos', color='red')
+                                ax.bar(x_pos + width, equity_m, width, label='Patrimonio', color='green')
                                 
                                 ax.set_xlabel('Año')
                                 ax.set_ylabel('Millones USD')
