@@ -359,7 +359,7 @@ def main():
                     continue
                     
                 with st.expander(f"Sector: {sec}", expanded=False):
-                    fig, ax = plt.subplots(figsize=(10, 5))
+                    fig, ax = plt.subforms(figsize=(10, 5))
                     rr = pd.DataFrame({
                         "ROE": (sec_df["ROE"]*100).values,
                         "ROA": (sec_df["ROA"]*100).values
@@ -402,7 +402,7 @@ def main():
             plt.close()
 
         # =====================================================
-        # SECCIÓN 4: ESTRUCTURA DE CAPITAL Y LIQUIDEZ
+        # SECCIÓN 4: ESTRUCTURA DE CAPITAL AND LIQUIDEZ
         # =====================================================
         st.header("🏦 Estructura de Capital y Liquidez (por sector)")
         
@@ -446,10 +446,10 @@ def main():
                                     liabilities_m = [l/1e6 if l and l > 0 else 0 for l in liabilities]
                                     equity_m = [e/1e6 if e and e > 0 else 0 for e in equity]
                                     
-                                    # Crear barras para cada categoría
-                                    ax.bar(x_pos - width, assets_m, width, label='Activos', color='#45B7D1')
-                                    ax.bar(x_pos, liabilities_m, width, label='Pasivos', color='#FF6B6B')
-                                    ax.bar(x_pos + width, equity_m, width, label='Patrimonio', color='#4ECDC4')
+                                    # Crear barras para cada categoría con los colores especificados
+                                    ax.bar(x_pos - width, assets_m, width, label='Activos', color='#0000FF')  # Azul fucsia
+                                    ax.bar(x_pos, liabilities_m, width, label='Pasivos', color='#FF6B6B')     # Rojo claro
+                                    ax.bar(x_pos + width, equity_m, width, label='Patrimonio', color='#90EE90') # Verde claro
                                     
                                     ax.set_xlabel('Año')
                                     ax.set_ylabel('Millones USD')
